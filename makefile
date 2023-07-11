@@ -17,10 +17,10 @@ bench_hlll:   xxhash.o hlll.o
 
 
 
-hlll.o: hlll.cpp
+hlll.o: hlll.cpp hlll.h
 	$(CC) -o $@ -c $< $(CFLAGS)
 
-	
+
 
 xxhash.o: xxhash.c
 	$(CC) -o $@ -c $< $(CFLAGS)

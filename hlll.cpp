@@ -4,6 +4,7 @@
 #include <fstream>
 #include <bitset>
 #include "xxhash.h"
+#include "hlll.h"
 
 
 
@@ -16,12 +17,6 @@ using namespace std;
 
 
 
-uint64_t asm_log2(const uint64_t x) {
-	uint64_t y;
-	asm("\tbsr %1, %0\n" : "=r"(y) : "r"(x));
-	return y;
-}
-
 
 
 void printBinary(uint64_t number) {
@@ -31,30 +26,7 @@ void printBinary(uint64_t number) {
 
 
 
-void get_hashes(const uint64_t key,uint H, uint minZeroes,vector<pair<uint,uint>>& result){
-    result.clear();
-    uint64_t seed(666);
-    uint hash_id(0);
-    uint remaining_bits(63);
-    XXH64_hash_t hash = XXH64(&key, 8, seed);
-    uint supplementaryzeroes(0);
-    while(hash_id<H){
-        if(hash==0){
-            supplementaryzeroes=remaining_bits+1;
-            remaining_bits=63;
-            hash = XXH64(&key, 8, ++seed);
-        }
-        uint64_t rl(remaining_bits-asm_log2(hash)+supplementaryzeroes);
-        supplementaryzeroes=0;
-        if(rl > minZeroes){
-            result.push_back({rl-minZeroes,hash_id});
-        }
-        remaining_bits-=(rl+1);
-        hash-=(uint64_t)1<<(remaining_bits+1);
-        hash_id++;
-    }
 
-}
 
 
 
@@ -94,94 +66,25 @@ string intToString(uint64_t n) {
 
 
 
-void sketch_histogram(const vector<uint64_t>& S){
-    vector<uint64_t> result;
-    for(uint i(0);i<S.size();++i){
-        if(S[i]+1>result.size()){
-            result.resize(S[i]+1,0);
-        }
-        result[S[i]]++;
-    }
-    for(uint i(0);i<result.size();++i){
-       for(uint j(0);j<result[i];++j){
-            cout<<"*";
-        } 
-        cout<<"\n";
-    }
-    cout<<endl;
-}
 
 
 
-static double alpha(int m) {
-    switch(m) {
-    case 16:
-    return 0.673;
-    case 32:
-    return 0.697;
-    case 64:
-    return 0.709;
-    default:
-    return 0.7213 / (1.0 + 1.079/m);
-    }
-}
 
 
 void bench_hyperlogloglog(uint nb_hashes,uint64_t nb_inserted_element){
-    cout<<"I use "<<nb_hashes<<" to estimate card of "<<nb_inserted_element<<endl;
-    uint nH(nb_hashes);
-    uint min_value(0);
-    uint min_value_occurence(nH);
-    uint print(1000);
-    vector<uint64_t> sketchsimple(nH);
-    vector<pair<uint,uint>> hits;
-    for(uint64_t ne(1);ne<nb_inserted_element;ne++){
-        if(ne%print==0){
-            vector<uint> histo(100,0);;
-            uint64_t maxval(0);
-            for(uint i(0);i<nH;++i){    
-                histo[sketchsimple[i]]++;
-                maxval=max(maxval,sketchsimple[i]);
-            }
-            for(uint i(0);i<=maxval;++i){    
-                cout<< histo[i]<<" ";
-            }
-            cout<<endl;
-            cout<<"exp: "<<min_value<<" "<<intToString(ne)<<":  "<<maxval+1<<endl;
-            print*=10;
+	HL3 hl3((nb_hashes));
+	uint64_t print(1000);
+	for(uint64_t ne(1);ne<nb_inserted_element;ne++){
+		hl3.insert_key(ne);
+		if(ne%print==0){
+			hl3.display();
+            cout<<hl3.get_cardinality()/ne<<endl;
+            print*=2;
         }
-        get_hashes(ne,nH,min_value,hits);
-        for(uint32_t ih(0);ih<hits.size();++ih){
-            if(hits[ih].first>sketchsimple[hits[ih].second]){
-                if(hits[ih].first<63){
-                    if(sketchsimple[hits[ih].second]==0){
-                        min_value_occurence--;
-                    }
-                    sketchsimple[hits[ih].second]=hits[ih].first;
-                }
-            }
-        }
-        while(min_value_occurence==0){
-            min_value++;
-            for(uint32_t lih(0);lih<nH;++lih){
-                sketchsimple[lih]--;
-                if(sketchsimple[lih]==0){
-                    min_value_occurence++;
-                }
-            }
-        }
-    }
-    double estimation(0);
-    for(uint32_t lih(0);lih<nH;++lih){
-        estimation+=(double)1/(double)pow(2,1+min_value+sketchsimple[lih]);
-    }
-    cout<<alpha(nH)* nH /estimation<<endl;
-    cout<<(alpha(nH)* nH /estimation)/nb_inserted_element<<endl;
+	}
 }
 
-
-
 int main() {
-    bench_hyperlogloglog(100,10000000);
+    bench_hyperlogloglog(64,1000*1000*1000);
     return 0;
 }
