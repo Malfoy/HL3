@@ -15,6 +15,9 @@ hlll.o: hlll.cpp hlll.h
 xxhash.o: xxhash.c
 	$(CC) -o $@ -c $< $(CFLAGS)
 
+hl2: hl2.c
+	gcc -o $@  $< -lxxhash -lm -Wall -Ofast
+
 hl3: hl3.c
 	gcc -o $@  $< -lxxhash -lm -Wall -Ofast
 
